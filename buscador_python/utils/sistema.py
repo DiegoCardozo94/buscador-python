@@ -1,26 +1,54 @@
 import os
+import shutil # Necesario para mover si os.rename falla por cruce de dispositivos
 
 def eliminar_archivo(ruta):
+    """
+    Elimina un archivo, retornando None si tiene éxito o un mensaje de error.
+    """
     try:
         if os.path.exists(ruta):
+            # Usar os.remove para eliminar el archivo
             os.remove(ruta)
             return None
         else:
-            return f"Archivo no existe: {ruta}"
-    except Exception as e:
+            # Archivo ya no existe, reportar para el log, pero no es un error de eliminación
+            return f"Archivo no existe: {ruta}" 
+    except (FileNotFoundError, PermissionError, IOError) as e:
+        # Captura errores de I/O, como permisos insuficientes o archivos abiertos
         return f"Error eliminando {ruta}: {e}"
+    except Exception as e:
+        # Otros errores inesperados
+        return f"Error inesperado al eliminar {ruta}: {e}"
 
 def mover_archivo(origen, destino):
-    import os
+    """
+    Mueve un archivo a una nueva ubicación, asegurando que el nombre 
+    de destino sea único para evitar sobrescribir.
+    """
     try:
+        # 1. Crear el directorio destino si no existe
         os.makedirs(os.path.dirname(destino), exist_ok=True)
+        
+        # 2. Lógica para manejar la colisión de nombres
         nombre_base, ext = os.path.splitext(os.path.basename(destino))
         contador = 1
         nuevo_destino = destino
+        
         while os.path.exists(nuevo_destino):
+            # Si el archivo ya existe en el destino, añadir (1), (2), etc.
             nuevo_destino = os.path.join(os.path.dirname(destino), f"{nombre_base} ({contador}){ext}")
             contador += 1
-        os.rename(origen, nuevo_destino)
+            
+        # 3. Intentar mover. os.rename es más rápido pero falla entre dispositivos/particiones.
+        try:
+            os.rename(origen, nuevo_destino)
+        except OSError:
+            # Si os.rename falla (ej. moviendo a otra partición), usar shutil.move
+            shutil.move(origen, nuevo_destino)
+
         return None
+        
+    except (FileNotFoundError, PermissionError, IOError) as e:
+        return f"Error de I/O moviendo {origen}: {e}"
     except Exception as e:
-        return f"Error moviendo {origen} a {destino}: {e}"
+        return f"Error inesperado al mover {origen}: {e}"
