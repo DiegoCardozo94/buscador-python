@@ -121,14 +121,17 @@ class VentanaDuplicados(HilosMixin, EstadoMixin):
         self.boton_mover = ttk.Button(frame_botones, text="📂 Mover duplicados a 'borrar'", command=self.mover_duplicados_a_carpeta)
         self.boton_mover.grid(row=0, column=1, padx=10)
         
-        self.boton_mover_imagenes = ttk.Button(frame_botones, text="🖼️ Mover imágenes (todos) a 'extraidas'", command=self.mover_imagenes_a_carpeta)
-        self.boton_mover_imagenes.grid(row=0, column=2, padx=10)
+        self.boton_mover_videos = ttk.Button(frame_botones, text="🎥 Mover videos (todos) a 'videos extraidos'", command=self.mover_videos_a_carpeta)
+        self.boton_mover_videos.grid(row=0, column=2, padx=10)
+        
+        self.boton_mover_imagenes = ttk.Button(frame_botones, text="🖼️ Mover imágenes (todos) a 'imagenes extraidas'", command=self.mover_imagenes_a_carpeta)
+        self.boton_mover_imagenes.grid(row=0, column=3, padx=10)
         
         self.boton_refrescar = ttk.Button(frame_botones, text="🔄 Refrescar resultados", command=self.refrescar_resultados)
-        self.boton_refrescar.grid(row=0, column=3, padx=10)
+        self.boton_refrescar.grid(row=0, column=4, padx=10)
         
         self.boton_comparar = ttk.Button(frame_botones, text="🆚 Comparar y eliminar entre carpetas", command=self.comparar_y_eliminar_entre_carpetas)
-        self.boton_comparar.grid(row=0, column=4, padx=10)
+        self.boton_comparar.grid(row=0, column=5, padx=10)
 
         # --- 5. Botones de acción avanzada (Prefijo) ---
         frame_prefijo = ttk.Frame(self.ventana)

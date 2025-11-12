@@ -114,21 +114,31 @@ class HilosMixin:
         threading.Thread(target=self._cargar_thumbnail_tarea, args=(ruta,), daemon=True).start()
 
     def _cargar_thumbnail_tarea(self, ruta):
-        """Genera el thumbnail en un hilo y lo actualiza en la GUI."""
-        try:
-            img = imagenes.obtener_thumbnail(ruta)
-            
-            if img:
-                img_tk = ImageTk.PhotoImage(img)
-                self.current_thumbnail_tk = img_tk # Mantener la referencia fuerte
-                self.ventana.after(0, self.thumbnail_label.config, {'image': img_tk, 'text': ''})
-            else:
-                self.ventana.after(0, self.thumbnail_label.config, {'image': '', 'text': 'No disponible\n(Error o video muy grande)'})
+            """Genera el thumbnail en un hilo y lo actualiza en la GUI."""
+            try:
+                # 1. Tarea pesada (obtener y redimensionar la imagen) en el hilo de trabajo
+                img = imagenes.obtener_thumbnail(ruta)
                 
-        except Exception as e:
-            self.ventana.after(0, self.thumbnail_label.config, {'image': '', 'text': 'Error al cargar'})
-            print(f"Error al mostrar thumbnail: {e}")
-            
+                if img:
+                    # 2. Convertir la imagen a formato Tkinter (aún en el hilo de trabajo)
+                    img_tk = ImageTk.PhotoImage(img)
+                    
+                    # 3. Función de callback para el hilo principal (ejecuta la configuración y la asignación)
+                    def actualizar_label():
+                        self.current_thumbnail_tk = img_tk 
+                        self.thumbnail_label.config(image=self.current_thumbnail_tk, text='')
+                        
+                    # 4. Enviar el callback al hilo principal
+                    self.ventana.after(0, actualizar_label)
+                else:
+                    # Caso de error simple (se ejecuta en el hilo principal)
+                    self.ventana.after(0, self.thumbnail_label.config, {'image': '', 'text': 'No disponible\n(Error o video muy grande)'})
+                    
+            except Exception as e:
+                # Manejo de excepciones (se ejecuta en el hilo principal)
+                self.ventana.after(0, self.thumbnail_label.config, {'image': '', 'text': 'Error al cargar'})
+                print(f"Error al mostrar thumbnail: {e}")
+
     # --- Lógica de Acción (Eliminar / Mover / Comparar, etc.) ---
     
     def eliminar_duplicados_automatico(self):
@@ -189,9 +199,7 @@ class HilosMixin:
         if not archivos_a_mover:
             messagebox.showinfo("Nada que mover", "No hay duplicados para mover.")
             return
-            
-        # ... (Resto de la validación y confirmación) ...
-        
+
         def mover_tarea():
             errores = []
             for i, ruta in enumerate(archivos_a_mover, 1):
@@ -206,6 +214,49 @@ class HilosMixin:
 
         threading.Thread(target=mover_tarea, daemon=True).start()
     
+    def mover_videos_a_carpeta(self):
+        carpeta_raiz = self.entrada_carpeta.get()
+        if not carpeta_raiz or not os.path.isdir(carpeta_raiz):
+            messagebox.showwarning("Error", "Selecciona una carpeta válida.")
+            return
+
+        carpeta_destino = os.path.join(carpeta_raiz, "videos extraidos")
+        os.makedirs(carpeta_destino, exist_ok=True)
+
+        # Usar archivos.EXT_VIDEOS para encontrar los archivos
+        videos_info = archivos.encontrar_archivos(carpeta_raiz, archivos.EXT_VIDEOS)
+        videos_a_mover = [info['ruta'] for info in videos_info]
+        
+        if not videos_a_mover:
+            messagebox.showinfo("Sin videos", "No se encontraron videos para mover.")
+            return
+            
+        confirmar = messagebox.askyesno("Mover Videos",
+            f"Se moverán {len(videos_a_mover)} videos de la carpeta principal a la subcarpeta '{os.path.basename(carpeta_destino)}'.\n\n¿Continuar?")
+        
+        if not confirmar:
+            return
+
+        # Preparar la barra de progreso
+        self.progress_bar["maximum"] = len(videos_a_mover)
+        self.progress_bar["value"] = 0
+        self.ventana.update_idletasks()
+
+        def mover_videos_tarea():
+            errores = []
+            for i, ruta in enumerate(videos_a_mover, 1):
+                # Usar sistema.mover_archivo, asegurando que el nombre de archivo sea único si ya existe
+                destino = os.path.join(carpeta_destino, os.path.basename(ruta))
+                error = sistema.mover_archivo(ruta, destino)
+                if error:
+                    errores.append(error)
+                self.ventana.after(0, self._actualizar_progreso_eliminacion, i, len(videos_a_mover))
+
+            self.ventana.after(0, lambda: messagebox.showinfo("Hecho", f"Se movieron {len(videos_a_mover) - len(errores)} videos a '{carpeta_destino}'."))
+            self.ventana.after(0, self.seleccionar_carpeta)
+
+        threading.Thread(target=mover_videos_tarea, daemon=True).start()
+
     def mover_imagenes_a_carpeta(self):
         carpeta_raiz = self.entrada_carpeta.get()
         if not carpeta_raiz or not os.path.isdir(carpeta_raiz):
@@ -221,8 +272,6 @@ class HilosMixin:
         if not imagenes_a_mover:
             messagebox.showinfo("Sin imágenes", "No se encontraron imágenes para mover.")
             return
-            
-        # ... (Resto de la validación y confirmación) ...
 
         def mover_imagenes_tarea():
             errores = []
@@ -255,8 +304,6 @@ class HilosMixin:
         if not candidatas_a_eliminar:
             messagebox.showinfo("Sin coincidencias", f"No se encontraron imágenes que empiecen con '{prefijo}'.")
             return
-            
-        # ... (Resto de la validación y confirmación) ...
 
         def eliminar_tarea():
             errores = []

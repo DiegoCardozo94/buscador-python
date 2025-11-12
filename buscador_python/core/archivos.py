@@ -11,39 +11,38 @@ def crear_info_archivo(ruta, tamaño):
         'tamaño': tamaño,
     }
 
-def encontrar_archivos(carpeta, extensiones=EXTENSIONES_VALIDAS, limite=None):
-    """
-    Escanea la carpeta recursivamente y devuelve una lista de diccionarios 
-    con la ruta y el tamaño de los archivos multimedia válidos.
-    """
-    archivos_info = []
+def encontrar_archivos(carpeta_raiz, extensiones_validas, limite=None):
+    archivos_encontrados = []
     
-    # Manejo de casos en que la carpeta no existe o no es accesible
-    if not os.path.isdir(carpeta):
-        # Podrías agregar un log o lanzar una excepción más específica aquí
-        return archivos_info
-
-    for raiz, _, nombres in os.walk(carpeta):
-        for nombre in nombres:
-            if nombre.lower().endswith(extensiones):
-                ruta = os.path.join(raiz, nombre)
+    for dirpath, dirnames, filenames in os.walk(carpeta_raiz):
+        for nombre_archivo in filenames:
+            ruta_completa = os.path.join(dirpath, nombre_archivo)
+            
+            _, ext = os.path.splitext(nombre_archivo)
+            ext = ext.lower()
+            
+            if ext in extensiones_validas:
                 
+                # --- CORRECCIÓN CLAVE AQUÍ ---
                 try:
-                    # Intenta obtener el tamaño y manejar errores de acceso/permisos
-                    tamaño = os.path.getsize(ruta)
-                except (FileNotFoundError, PermissionError):
-                    # Ignorar archivos que no se pueden acceder
-                    continue
-
-                ext = nombre.lower()
-                # Aplicar filtro de tamaño para videos (< 1MB se ignoran)
-                if ext.endswith(EXT_VIDEOS):
-                    if tamaño < 1 * 1024 * 1024:
-                        continue
-
-                # Almacenar la información estructurada
-                archivos_info.append(crear_info_archivo(ruta, tamaño))
+                    # 1. Obtener el tamaño del archivo
+                    tamano_bytes = os.path.getsize(ruta_completa)
+                except Exception:
+                    # Manejar archivos inaccesibles o rotos
+                    tamano_bytes = 0 
+                # ------------------------------
                 
-                if limite and len(archivos_info) >= limite:
-                    return archivos_info
-    return archivos_info
+                archivos_encontrados.append({
+                    'ruta': ruta_completa,
+                    'nombre': nombre_archivo,
+                    # 2. Asignar la clave 'tamaño' (en minúsculas)
+                    'tamaño': tamano_bytes,
+                    # Nota: El KeyError original usa 'tamaño' con ñ. Si tu código usa 'tamano'
+                    # (sin ñ), ajusta la clave en escanear_y_hash o aquí.
+                })
+                
+                # Opcional: Implementar el límite de archivos si limite no es None
+                if limite is not None and len(archivos_encontrados) >= limite:
+                    return archivos_encontrados
+    
+    return archivos_encontrados

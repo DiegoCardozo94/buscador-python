@@ -24,9 +24,12 @@ def mover_archivo(origen, destino):
     """
     Mueve un archivo a una nueva ubicación, asegurando que el nombre 
     de destino sea único para evitar sobrescribir.
+    
+    Devuelve None si tiene éxito, o un string con el mensaje de error si falla.
     """
     try:
         # 1. Crear el directorio destino si no existe
+        # Esto es crucial para que la función no falle si la carpeta 'videos extraidos' no existe
         os.makedirs(os.path.dirname(destino), exist_ok=True)
         
         # 2. Lógica para manejar la colisión de nombres
@@ -41,14 +44,19 @@ def mover_archivo(origen, destino):
             
         # 3. Intentar mover. os.rename es más rápido pero falla entre dispositivos/particiones.
         try:
+            # Intenta mover usando os.rename (rápido, dentro del mismo disco)
             os.rename(origen, nuevo_destino)
         except OSError:
-            # Si os.rename falla (ej. moviendo a otra partición), usar shutil.move
+            # Si os.rename falla (ej. moviendo a otra partición o unidad), usar shutil.move
+            # shutil.move maneja la copia y posterior eliminación
             shutil.move(origen, nuevo_destino)
 
+        # Si todo es exitoso
         return None
         
     except (FileNotFoundError, PermissionError, IOError) as e:
-        return f"Error de I/O moviendo {origen}: {e}"
+        # Captura errores comunes como "archivo en uso" o "permiso denegado"
+        return f"Error de I/O moviendo {os.path.basename(origen)}: {e}"
     except Exception as e:
-        return f"Error inesperado al mover {origen}: {e}"
+        # Captura cualquier otro error inesperado
+        return f"Error inesperado al mover {os.path.basename(origen)}: {e}"
